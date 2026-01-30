@@ -2,6 +2,7 @@
 # IMPORTS
 # ============================================================
 
+
 import random
 from datetime import datetime
 from typing import Optional
@@ -36,10 +37,7 @@ class FakeTickGenerator:
         self._clock = clock
         self._logger = logger
 
-        if seed is not None:
-            random.seed(seed)
-
-
+        self._rng = random.Random(seed)
   
     # ========================================================
     # TICK EMISSION
