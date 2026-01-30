@@ -50,13 +50,13 @@ class FakeTickGenerator:
         timestamp = self._clock.now()
 
         # Small random price movement
-        delta = random.uniform(-1.0, 1.0)
+        delta = self._rng.uniform(-1.0, 1.0)
         self._price = max(0.01, self._price + delta)
 
         tick = {
             "symbol": self.symbol,
             "price": round(self._price, 2),
-            "volume": random.randint(1, 100),
+            "volume": self._rng.randint(1, 100),
             "timestamp": timestamp,
         }
 
