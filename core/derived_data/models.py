@@ -51,7 +51,7 @@ class DerivedDataEvent:
 class DerivedUniverseSnapshot:
     timestamp: datetime
 
-    effective_universe: Set[str]
+    effective_universe: List[str]
     filtered_symbols: List[str]
     tradable_symbols: List[str]
 
