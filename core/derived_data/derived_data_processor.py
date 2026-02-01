@@ -53,7 +53,7 @@ class DerivedDataProcessor:
         self._logger = logger
         self._store = store
 
-        self._effective_universe: Set[str] = set()
+        self._effective_universe: List[str] = []
         self._symbols_missing_prev_day_ohlc: Set[str] = set()
 
         self._filtered_records: List[DerivedSymbolData] = []
@@ -67,8 +67,13 @@ class DerivedDataProcessor:
     # ========================================================
 
     def universe_refresh(self) -> None:
-        omitted = manually_omitted_symbols or set()
-        self._effective_universe = set(symbol_universe) - omitted
+        """
+        Reload symbol_universe and manually_omitted_symbols.
+        Preserve the order of symbol_universe so stable sorts remain deterministic.
+        """
+        omitted = set(manually_omitted_symbols or set())
+        # preserve symbol_universe order and filter omitted
+        self._effective_universe = [s for s in symbol_universe if s not in omitted]
 
         self._logger.info(
             "[DERIVED] Universe refreshed",
@@ -170,7 +175,7 @@ class DerivedDataProcessor:
             tradable_symbols=[r.symbol for r in self._tradable_records],
             symbols_missing_prev_day_ohlc=self._symbols_missing_prev_day_ohlc,
         )
-        
+
         self._store.persist_universe_snapshot(snapshot)
         self._event_bus.publish(snapshot)
 
