@@ -2,7 +2,7 @@
 # IMPORTS
 # ============================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Set
 
 from core.event_bus import EventBus
@@ -164,13 +164,13 @@ class DerivedDataProcessor:
         self._tradable_records = candidates[:top_n]
 
         snapshot = DerivedUniverseSnapshot(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             effective_universe=self._effective_universe,
             filtered_symbols=[r.symbol for r in self._filtered_records],
             tradable_symbols=[r.symbol for r in self._tradable_records],
             symbols_missing_prev_day_ohlc=self._symbols_missing_prev_day_ohlc,
         )
-
+        
         self._store.persist_universe_snapshot(snapshot)
         self._event_bus.publish(snapshot)
 
