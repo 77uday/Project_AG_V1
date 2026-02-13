@@ -2,19 +2,24 @@
 # IMPORTS
 # ============================================================
 
-from dataclasses import dataclass
-from datetime import datetime
-from typing import List, Dict, Optional, Set, Any
-
-from core.session.session_context import SessionContext
-
+from dataclasses import dataclass, field
+from typing import Dict, List, Any, Optional
+from datetime import datetime, date
 
 # ============================================================
-# DERIVED DATA PER SYMBOL (INTERNAL STRUCT)
+# DERIVED SYMBOL DATA
 # ============================================================
 
 @dataclass
 class DerivedSymbolData:
+    """
+    Per-symbol derived snapshot computed pre-market.
+
+    - target_range_pos / neg: list of absolute price levels (index => step_index).
+    - flip_range_pos / neg: list of absolute price levels (index => flip step index).
+    - prev_close is kept for reference and for stop-price derivation helpers.
+    - metadata: operator-editable dictionary (cap category, lot_size, etc.)
+    """
     symbol: str
     prev_high: float
     prev_low: float
@@ -25,37 +30,24 @@ class DerivedSymbolData:
     TC: float
     cpr_width_pct: float
 
-    target_range_pos: List[float]
-    target_range_neg: List[float]
+    target_range_pos: List[float] = field(default_factory=list)
+    target_range_neg: List[float] = field(default_factory=list)
+    flip_range_pos: List[float] = field(default_factory=list)
+    flip_range_neg: List[float] = field(default_factory=list)
 
-    flip_range_pos: List[float]
-    flip_range_neg: List[float]
-
-    metadata: Dict[str, Any]
-
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 # ============================================================
-# EVENTS
+# SNAPSHOT / EVENTS (lightweight outline)
 # ============================================================
-
-@dataclass
-class DerivedDataEvent:
-    timestamp: datetime
-    symbol: str
-    timeframe: str
-    derived: DerivedSymbolData
-    session_context: Optional[SessionContext]
-
 
 @dataclass
 class DerivedUniverseSnapshot:
     timestamp: datetime
-
     effective_universe: List[str]
     filtered_symbols: List[str]
     tradable_symbols: List[str]
-
-    symbols_missing_prev_day_ohlc: Set[str]
+    symbols_missing_prev_day_ohlc: List[str]
 
 
 @dataclass
