@@ -59,7 +59,7 @@ class DerivedDataProcessor:
         self._filtered_records: List[DerivedSymbolData] = []
         self._tradable_records: List[DerivedSymbolData] = []
 
-        # Subscribe only to session start for STEP-3
+        # Subscribe to session start for gap snapshot
         self._event_bus.subscribe(SessionStartEvent, self._on_session_start)
 
     # ========================================================
@@ -97,9 +97,10 @@ class DerivedDataProcessor:
 
         ks = []
         k = 0.0
-        while k <= max_k:
-            ks.append(k)
-            k += step
+        # ensure numeric stability: build by integer steps
+        num_steps = int(round((DERIVED_CFG["target_max_pct"] / DERIVED_CFG["target_step_pct"]))) + 1
+        for i in range(num_steps):
+            ks.append(i * step)
 
         pos = [x * (1 + k) for k in ks]
         neg = [x * (1 - k) for k in ks]
@@ -123,6 +124,7 @@ class DerivedDataProcessor:
         self.universe_refresh()
         self._symbols_missing_prev_day_ohlc.clear()
         self._filtered_records.clear()
+        self._tradable_records.clear()
 
         for symbol in self._effective_universe:
             ohlc = prev_day_ohlc.get(symbol)
@@ -152,9 +154,16 @@ class DerivedDataProcessor:
                 metadata=symbol_metadata.get(symbol, {}),
             )
 
+            # persist per-symbol derived data into store (new)
+            try:
+                self._store.persist_symbol_data(record)
+            except Exception as e:
+                # defensive: log but continue building the in-memory list
+                self._logger.info("[DERIVED] Failed to persist symbol data", symbol=symbol, error=str(e))
+
             self._filtered_records.append(record)
 
-        # Sort by CPR width
+        # Sort by CPR width, stable
         self._filtered_records.sort(key=lambda r: r.cpr_width_pct)
 
         # Apply threshold + top-N
@@ -173,9 +182,10 @@ class DerivedDataProcessor:
             effective_universe=self._effective_universe,
             filtered_symbols=[r.symbol for r in self._filtered_records],
             tradable_symbols=[r.symbol for r in self._tradable_records],
-            symbols_missing_prev_day_ohlc=self._symbols_missing_prev_day_ohlc,
+            symbols_missing_prev_day_ohlc=list(self._symbols_missing_prev_day_ohlc),
         )
 
+        # persist snapshot and publish as before
         self._store.persist_universe_snapshot(snapshot)
         self._event_bus.publish(snapshot)
 
@@ -191,8 +201,14 @@ class DerivedDataProcessor:
 
     def _on_session_start(self, event: SessionStartEvent) -> None:
         """
-        At 9:15 — compute gap up/down for tradable symbols.
+        At session start (e.g. 09:15) — compute gap up/down for tradable symbols.
+
+        Only publish gap snapshot when there are tradable symbols.
         """
+
+        if not self._tradable_records:
+            self._logger.info("[DERIVED] No tradables at session start; skipping gap snapshot.")
+            return
 
         gaps: Dict[str, Dict[str, float]] = {}
 
@@ -207,6 +223,10 @@ class DerivedDataProcessor:
                 "gap_pct": gap_pct,
                 "gap_pct_abs": abs(gap_pct),
             }
+
+        if not gaps:
+            self._logger.info("[DERIVED] No gap data computed; skipping emit.")
+            return
 
         gap_event = GapSnapshotEvent(
             timestamp=event.timestamp,
