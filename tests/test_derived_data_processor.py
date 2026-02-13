@@ -221,3 +221,114 @@ def test_no_gap_emitted_when_no_tradables(processor, store):
 
     # no gap snapshots should be created
     assert len(store.gap_snapshots) == 0
+
+# ============================================================
+# HELPER FUNCTION TESTS (DerivedDataStore)
+# ============================================================
+
+def test_get_target_by_step(store):
+    """
+    Ensures target_range_pos and target_range_neg
+    return correct absolute price levels.
+    """
+
+    from core.derived_data.models import DerivedSymbolData
+
+    prev_close = 100.0
+
+    record = DerivedSymbolData(
+        symbol="AAA",
+        prev_high=105.0,
+        prev_low=95.0,
+        prev_close=prev_close,
+        P=100.0,
+        BC=99.0,
+        TC=101.0,
+        cpr_width_pct=0.2,
+        target_range_pos=[100.0, 100.25, 100.5],
+        target_range_neg=[100.0, 99.75, 99.5],
+        flip_range_pos=[],
+        flip_range_neg=[],
+        metadata={},
+    )
+
+    store.persist_symbol_data(record)
+
+    assert store.get_target_by_step("AAA", 1, "pos") == 100.25
+    assert store.get_target_by_step("AAA", 2, "neg") == 99.5
+    assert store.get_target_by_step("AAA", 5, "pos") is None
+
+
+def test_get_flip_for_step(store):
+    """
+    Ensures flip ranges return correct levels.
+    """
+
+    from core.derived_data.models import DerivedSymbolData
+
+    prev_close = 100.0
+
+    record = DerivedSymbolData(
+        symbol="BBB",
+        prev_high=105.0,
+        prev_low=95.0,
+        prev_close=prev_close,
+        P=100.0,
+        BC=99.0,
+        TC=101.0,
+        cpr_width_pct=0.2,
+        target_range_pos=[],
+        target_range_neg=[],
+        flip_range_pos=[100.0, 100.02, 100.04],
+        flip_range_neg=[100.0, 99.98, 99.96],
+        metadata={},
+    )
+
+    store.persist_symbol_data(record)
+
+    assert store.get_flip_for_step("BBB", 1, "pos") == 100.02
+    assert store.get_flip_for_step("BBB", 2, "neg") == 99.96
+    assert store.get_flip_for_step("BBB", 10, "pos") is None
+
+
+def test_get_stop_for_step(store):
+    """
+    Stop price must be symmetric relative to prev_close.
+    Example:
+        prev_close = 100
+        target_pos step = 100.25 (+0.25%)
+        stop should be 99.75 (-0.25%)
+    """
+
+    from core.derived_data.models import DerivedSymbolData
+
+    prev_close = 100.0
+
+    record = DerivedSymbolData(
+        symbol="CCC",
+        prev_high=105.0,
+        prev_low=95.0,
+        prev_close=prev_close,
+        P=100.0,
+        BC=99.0,
+        TC=101.0,
+        cpr_width_pct=0.2,
+        target_range_pos=[100.0, 100.25],
+        target_range_neg=[100.0, 99.75],
+        flip_range_pos=[],
+        flip_range_neg=[],
+        metadata={},
+    )
+
+    store.persist_symbol_data(record)
+
+    # LONG case
+    stop_long = store.get_stop_for_step("CCC", 1, "pos")
+    assert round(stop_long, 2) == 99.75
+
+    # SHORT case
+    stop_short = store.get_stop_for_step("CCC", 1, "neg")
+    assert round(stop_short, 2) == 100.25
+
+    # Out-of-range safety
+    assert store.get_stop_for_step("CCC", 10, "pos") is None

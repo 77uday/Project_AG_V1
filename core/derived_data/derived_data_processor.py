@@ -18,7 +18,6 @@ from core.derived_data.config import (
 
 from core.derived_data.models import (
     DerivedSymbolData,
-    DerivedDataEvent,
     DerivedUniverseSnapshot,
     GapSnapshotEvent,
 )
