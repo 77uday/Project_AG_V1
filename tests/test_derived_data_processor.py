@@ -13,7 +13,7 @@ from core.session.session_context import SessionContext
 # Simple test EventBus and Logger (local to tests)
 # ============================================================
 
-class TestEventBus:
+class _TestEventBus:
     def __init__(self):
         # key: event class -> list of handlers
         self._subs = {}
@@ -36,7 +36,7 @@ class TestEventBus:
                         h(event)
 
 
-class TestLogger:
+class _TestLogger:
     def __init__(self):
         self.records = []
 
@@ -51,12 +51,12 @@ class TestLogger:
 
 @pytest.fixture
 def event_bus():
-    return TestEventBus()
+    return _TestEventBus()
 
 
 @pytest.fixture
 def logger():
-    return TestLogger()
+    return _TestLogger()
 
 
 @pytest.fixture

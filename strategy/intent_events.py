@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional, Any, Dict
 
@@ -57,7 +57,7 @@ class IntentEvent:
     symbol: str
     triggers: List[TriggerSpec]
     auto_advance: bool = True
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     correlation_id: Optional[str] = None
     session_date: Optional[str] = None
 
@@ -70,18 +70,18 @@ class IntentEvent:
 class ApprovedIntentEvent:
     intent: IntentEvent
     approved_by: str
-    approved_at: datetime = field(default_factory=datetime.utcnow)
+    approved_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
 class RejectedIntentEvent:
     intent: IntentEvent
     reason: str
-    rejected_at: datetime = field(default_factory=datetime.utcnow)
+    rejected_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
 class IntentExpiredEvent:
     intent: IntentEvent
     reason: Optional[str]
-    expired_at: datetime = field(default_factory=datetime.utcnow)
+    expired_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
