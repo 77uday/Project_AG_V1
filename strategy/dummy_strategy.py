@@ -70,8 +70,12 @@ class DummyStrategy:
 
         # Subscribe to events
         self._bus.subscribe(GapSnapshotEvent, self._on_gap_snapshot)
-        if OrderFillEvent is not None:
-            self._bus.subscribe(OrderFillEvent, self._on_order_fill)
+
+        # Always subscribe to a catch-all so tests that publish plain objects (DummyFill)
+        # are handled. The handler will inspect the event shape and ignore unrelated events.
+        # This avoids a hard dependency on core.events.order_events during early checkpoints.
+        self._bus.subscribe(object, self._on_order_fill)
+
         self._bus.subscribe(SessionEndEvent, self._on_session_end)
 
         self._log.info("[STRATEGY] DummyStrategy initialized", strategy_id=self._id)
@@ -106,7 +110,7 @@ class DummyStrategy:
         return intent
 
     def _publish_intent(self, intent: IntentEvent) -> None:
-        # Publish raw IntentEvent (RiskManager is expected to pick up, approve, etc.)
+        # Publish raw IntentEvent (RiskManager is expected to pick it up, approve, etc.)
         self._bus.publish(intent)
         self._active_intent_id = intent.intent_id
         self._log.info("[STRATEGY] Intent emitted", intent_id=intent.intent_id, symbol=intent.symbol, step_index=intent.triggers[0].step_index)
@@ -146,16 +150,22 @@ class DummyStrategy:
 
     def _on_order_fill(self, event: Any) -> None:
         """
-        Handle OrderFillEvent (structure varies by adapter).
-        We attempt to extract an intent id from event and check if it matches active intent.
-        If so — advance step (if auto_advance) and emit next IntentEvent.
+        Handle OrderFillEvent-like objects.
+
+        This handler is intentionally registered as a catch-all (object). It inspects
+        the incoming event and proceeds only if the event *looks like* a fill:
+         - has attribute 'intent_id' OR
+         - has attribute 'origin_intent_id' OR
+         - has attribute 'intent' which contains 'intent_id'
+
+        This makes the strategy robust in tests where a plain object is used to simulate fills,
+        and it avoids a hard import dependency on a concrete OrderFillEvent dataclass.
         """
         if not self._active or not self._active_intent_id:
             return
 
         # extract intent id robustly
         intent_id = None
-        # common shapes:
         if hasattr(event, "intent_id"):
             intent_id = getattr(event, "intent_id")
         elif hasattr(event, "origin_intent_id"):
@@ -163,6 +173,9 @@ class DummyStrategy:
         elif hasattr(event, "intent") and getattr(event, "intent") is not None:
             nested = getattr(event, "intent")
             intent_id = getattr(nested, "intent_id", None)
+        else:
+            # not a fill-like object
+            return
 
         if intent_id != self._active_intent_id:
             # not related to our current active intent
