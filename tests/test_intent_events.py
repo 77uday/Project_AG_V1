@@ -2,7 +2,7 @@
 # IMPORTS
 # ============================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from strategy.intent_events import (
     IntentEvent,
@@ -46,7 +46,7 @@ def test_intent_event_creation():
         symbol="AAA",
         triggers=triggers,
         auto_advance=True,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         correlation_id="CORR-1",
         session_date="2026-02-14",
     )
@@ -73,7 +73,7 @@ def test_intent_lifecycle_events():
         symbol="BBB",
         triggers=[trigger],
         auto_advance=True,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
 
     approved = ApprovedIntentEvent(intent=intent, approved_by="RiskManager")
